@@ -1,7 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Entry point. Presents the interactive prompt.
 
-
-echo "terraformAWS Prompt"
-sleep 1
+set -euo pipefail
 
 bash "./shell/prompt.sh"

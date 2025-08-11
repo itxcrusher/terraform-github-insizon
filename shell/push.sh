@@ -1,18 +1,15 @@
-#!/bin/bash
-environment="dev"
+#!/usr/bin/env bash
+# Commit and push all changes to the current Git branch.
 
-echo "About to run terraform plan"
-sleep 1
+set -euo pipefail
 
-echo "Changing to root directory"
-cd ".."
+REPO_ROOT="$(cd -- "$(dirname "$0")/.." >/dev/null 2>&1 && pwd)"
 
-echo "About to push to Github"
-sleep 1
-git add .
-git commit -m "Working hard"
+cd "$REPO_ROOT"
+
+# Basic safety: do not commit secrets. The 'private/' directory should already be gitignored.
+# You can extend this with additional checks as needed.
+
+git add -A
+git commit -m "Infrastructure updates"
 git push
-
-
-echo "Changing to root directory"
-cd "../shell"

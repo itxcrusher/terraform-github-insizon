@@ -1,24 +1,10 @@
 # Root.tf
-# root.tf file is where you places all modules
+# root.tf file is where you places all module calls
+# and other resources that are not part of a module.
 
-
-locals {
-  AppNameObj = {
-    for idx, name in var.app-names-list :
-    name => {
-      "name" : name
-      IsEnabled : strcontains(name, "dev") ? true : false
-    }
-  }
-}
-
-
-module "webapp_module" {
-  source = "./modules/webapp"
-
-  webapp_object = {
-    AppName  = "insizontest-dev"
-    ObjectId = var.app_object.ObjectId
-    TenantId = var.app_object.TenantId
+# temporarily in src/root.tf for verification
+resource "null_resource" "phase1_sanity" {
+  triggers = {
+    env = var.aws_profile
   }
 }

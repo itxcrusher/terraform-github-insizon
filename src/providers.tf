@@ -1,21 +1,25 @@
-# Providers 
-# providers.ts is the file where you list and configure your providers to be use. Ex Aws, Azure, Gcp
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs
 terraform {
   required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
     github = {
       source  = "integrations/github"
       version = "~> 6.0"
     }
   }
 
-  required_version = ">= 0.13"
+  required_version = ">= 1.3"
 }
 
-# Configure the GitHub Provider
-provider "github" {}
+# AWS Provider configuration
+provider "aws" {
+  region  = var.aws_region
+  profile = var.aws_profile
+}
 
-# Add a user to the organization
-# resource "github_membership" "membership_for_user_x" {
-  
-# }
+# GitHub Provider configuration
+provider "github" {
+  token = var.github_token
+}

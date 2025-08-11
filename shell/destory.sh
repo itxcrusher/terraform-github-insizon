@@ -1,22 +1,25 @@
-#!/bin/bash
-environment="dev"
+#!/usr/bin/env bash
+# Destroy terraform resources for a given environment.
+# Usage: bash destroy.sh <dev|qa|prod>
+# A confirmation prompt is included to avoid accidental destruction.
 
-echo "About to run terraform destroy"
-sleep 1
+set -euo pipefail
 
-echo "Changing to root directory"
-cd "../src"
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=common.sh
+source "$SCRIPT_DIR/common.sh"
 
-echo "About to delete .terraform folder"
-rm -rf "./terraform"
-sleep 1
+ENVIRONMENT="${1:-}"
+require_env "$ENVIRONMENT"
 
-echo "About to source project"
-source ".env"
-sleep 1
+read -r -p "Confirm destroy for environment '$ENVIRONMENT' (type 'destroy'): " CONFIRM
+if [[ "$CONFIRM" != "destroy" ]]; then
+  echo "Aborted."
+  exit 1
+fi
 
-echo "About to create .terraform folder"
-terraform init
-sleep 1
+tf_backend_init "$ENVIRONMENT"
+tf_format_validate
 
-terraform destroy -var-file="./env/$environment.tfvars"
+cd "$TF_ROOT"
+terraform destroy -var-file="./env/${ENVIRONMENT}.tfvars" -auto-approve

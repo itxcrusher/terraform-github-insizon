@@ -1,16 +1,12 @@
-#!/bin/bash
-environment="dev"
+#!/usr/bin/env bash
+# Format Terraform code in the repository.
 
-echo "About to run terraform plan"
-sleep 1
+set -euo pipefail
 
-echo "Changing to root directory"
-cd "../src"
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=common.sh
+source "$SCRIPT_DIR/common.sh"
 
-echo "About to formate code"
+cd "$TF_ROOT"
 terraform fmt -recursive
-sleep 1
-
-
-echo "Changing to shell directory"
-cd "../shell"
+echo "Formatting complete."

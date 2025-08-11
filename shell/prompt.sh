@@ -1,77 +1,61 @@
-#!/bin/bash
-# Working hard
-environment="dev"
+#!/usr/bin/env bash
+# Interactive menu to run common tasks.
+# Allows selecting an environment and running fmt, plan, apply, output, destroy, push.
 
+set -euo pipefail
 
-# Chaning working dir
-echo "Chaning workign dir"
-cd "./shell/"
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
 
-prompt_select() {
-title="Select example"
-prompt="Pick an option:"
-options=("Key.sh" "Fmt.sh" "Plan.sh" "Apply.sh" "Output.sh" "Key-single.sh" "Destory.sh" "Push.sh")
-
-echo "$title"
-PS3="$prompt "
-select opt in "${options[@]}" "Quit"; 
-do 
-    case "$REPLY" in
-    1) 
-      echo "You picked $opt which is option 1"
-      bash "./create-all-cloudfront-keys.sh"
-      ;;
-    2) 
-      echo "You picked $opt which is option 2"
-      bash "./fmt.sh"
-      ;;
-    3) 
-      echo "You picked $opt which is option 3"
-      echo "What is this -       echo $PWD"
-      bash "./plan.sh" "$environment"
-      ;;
-    4) 
-      echo "You picked $opt which is option 3"
-      bash "./apply.sh" "$environment"
-      ;;
-     5) 
-      echo "You picked $opt which is option 3"
-      bash "./output.sh"
-      ;;
-     6) 
-      echo "You picked $opt which is option 3"
-      bash "./create-single-cloudfront-key.sh"
-      ;;
-      7) 
-      echo "You picked $opt which is option 3"
-        echo "Please type destory to destory all resources:"
-        read userInput
-        if [ "$userInput" = "destory" ];
-        then
-          echo "Final chance to stop cancel in 25s"
-          sleep 25
-          bash "./destory.sh"
-        else
-          echo "Incorrect"
-        fi 
-      ;;
-      8) 
-      echo "You picked $opt which is option 3"
-      bash "./push.sh"
-      ;;
-      9) 
-        echo "Goodbye!"; 
-        break
+select_environment() {
+  local env
+  PS3="Select environment (1=dev, 2=qa, 3=prod, 4=Quit): "
+  select env in dev qa prod "Quit"; do
+    case "$env" in
+      dev|qa|prod)
+        # Return just the value
+        printf "%s" "$env"
+        return 0
         ;;
-      *) 
-        echo "Invalid option. Try another one.";
-        echo "#####################################"
-        echo "${options[@]}" "Quit"
-        echo "#####################################"
-        continue
+      "Quit")
+        exit 0
+        ;;
+      *)
+        echo "Invalid selection."
         ;;
     esac
-done
+  done
 }
 
-prompt_select
+main_menu() {
+  local env choice
+  env="$(select_environment)"
+
+  while true; do
+    echo
+    echo "Environment: $env"
+    PS3="Choose an action: "
+    select choice in "Format (fmt)" "Plan" "Apply" "Output" "Destroy" "Push" "Change Env" "Quit"; do
+      case "$REPLY" in
+        1) bash "$SCRIPT_DIR/fmt.sh"; break ;;
+        2) bash "$SCRIPT_DIR/plan.sh"  "$env"; break ;;
+        3) bash "$SCRIPT_DIR/apply.sh" "$env"; break ;;
+        4)
+           read -r -p "Output name (empty for all): " out_name
+           if [[ -z "$out_name" ]]; then
+             bash "$SCRIPT_DIR/output.sh" "$env"
+           else
+             bash "$SCRIPT_DIR/output.sh" "$env" "$out_name"
+           fi
+           break
+           ;;
+        5) bash "$SCRIPT_DIR/destroy.sh" "$env"; break ;;
+        6) bash "$SCRIPT_DIR/push.sh"; break ;;
+        7) env="$(select_environment)"; break ;;
+        8) exit 0 ;;
+        *) echo "Invalid option."; continue ;;
+      esac
+    done
+  done
+}
+
+main_menu

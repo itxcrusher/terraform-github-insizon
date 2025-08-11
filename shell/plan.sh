@@ -1,29 +1,18 @@
-#!/bin/bash
-environment="$1"
+#!/usr/bin/env bash
+# Run terraform plan for a given environment.
+# Usage: bash plan.sh <dev|qa|prod>
 
-echo "About to run terraform plan"
-sleep 1
+set -euo pipefail
 
-echo "Changing to root directory"
-cd "../src"
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=common.sh
+source "$SCRIPT_DIR/common.sh"
 
+ENVIRONMENT="${1:-}"
+require_env "$ENVIRONMENT"
 
-echo "About to delete .terraform folder"
-rm -rf "./terraform"
-sleep 1
+tf_backend_init "$ENVIRONMENT"
+tf_format_validate
 
-
-echo "About to formate code"
-terraform fmt -recursive
-sleep 1
-
-echo "About to source project"
-source ".env"
-sleep 1
-
-echo "About to create .terraform folder"
-terraform init
-sleep 1
-
-# terraform force-unlock -force "c6d863a2-3588-22af-8fbd-c5dab53c7477"
-terraform plan -var-file="./env/$environment.tfvars"
+cd "$TF_ROOT"
+terraform plan -var-file="./env/${ENVIRONMENT}.tfvars"

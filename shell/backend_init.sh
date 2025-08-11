@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Run terraform apply for a given environment.
-# Usage: bash apply.sh <dev|qa|prod>
+# Initialize Terraform backend for the specified environment.
+# Usage: bash backend_init.sh <dev|qa|prod>
 
 set -euo pipefail
 
@@ -12,7 +12,4 @@ ENVIRONMENT="${1:-}"
 require_env "$ENVIRONMENT"
 
 tf_backend_init "$ENVIRONMENT"
-tf_format_validate
-
-cd "$TF_ROOT"
-terraform apply -var-file="./env/${ENVIRONMENT}.tfvars" -auto-approve
+echo "Backend initialized for environment: $ENVIRONMENT"

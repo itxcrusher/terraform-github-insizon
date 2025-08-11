@@ -1,0 +1,7 @@
+# Remote backend configuration for prod environment
+bucket         = "insizon-terraform-remote-state-backend-bucket"
+key            = "terraform-github/prod/terraform.tfstate"
+region         = "us-east-2"
+dynamodb_table = "terraform-locks"
+profile        = "insizon"
+encrypt        = true

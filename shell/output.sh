@@ -1,11 +1,24 @@
-#!/bin/bash
-environment="dev"
+#!/usr/bin/env bash
+# Print a terraform output for a given environment.
+# Usage: bash output.sh <dev|qa|prod> [output_name]
+# If output_name is omitted, prints all outputs (non-raw).
 
-echo "About to run terraform output"
-sleep 1
+set -euo pipefail
 
-echo "Changing to root directory"
-cd "../src"
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=common.sh
+source "$SCRIPT_DIR/common.sh"
 
+ENVIRONMENT="${1:-}"
+OUTPUT_NAME="${2:-}"
 
-terraform output -raw my_output
+require_env "$ENVIRONMENT"
+
+tf_backend_init "$ENVIRONMENT"
+
+cd "$TF_ROOT"
+if [[ -z "$OUTPUT_NAME" ]]; then
+  terraform output
+else
+  terraform output -raw "$OUTPUT_NAME"
+fi

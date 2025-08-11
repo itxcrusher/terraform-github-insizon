@@ -3,16 +3,9 @@
 .env
 .env.sh
 env.sh
-shell/backend_init.sh
 private/*
 secrets/*
 .DS_Store
-private/iam_access_keys/*
-private/images/*
-private/key_vault_manager/*
-private/access_key/*
-private/database_passwords/*
-
 
 # Local .terraform directories
 **/.terraform/*
