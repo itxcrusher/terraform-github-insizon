@@ -1,7 +1,7 @@
 # Terraform GitHub Insizon
 
 This repository manages infrastructure for the **Insizon** GitHub organization and AWS environments using **Terraform**, shell automation, and supporting scripts.
-It is designed for **multi-environment remote state management** (`dev`, `qa`, `prod`), automated AWS resource provisioning, GitHub organization and repository management, CI/CD integration, and secure secrets handling.
+It is designed for **multi-environment remote state management** (`dev`, `qa`, `prod`), automated AWS resource provisioning, GitHub organization and repository management, CI/CD integration via AWS CodeBuild, and secure secrets handling.
 
 ---
 
@@ -28,7 +28,7 @@ index.sh             → Root launcher for interactive prompt
 shell/               → Shell scripts for Terraform and automation tasks
 secrets/             → Local scripts for syncing secrets with RDS
 src/                 → Terraform code, configs, and automation scripts
-ts/                  → TypeScript code for AWS Glacier, SMS, etc.
+ts/                  → TypeScript code (reserved for future AWS Glacier, SMS, etc.)
 private/             → Local-only secrets (gitignored)
 ```
 
@@ -36,40 +36,42 @@ private/             → Local-only secrets (gitignored)
 
 * `apply.sh` — Run Terraform apply for a given env
 * `backend_init.sh` — Initialize backend for a specific environment
+* `ensure_backend.sh` — Ensure backend config is valid before running Terraform
 * `destroy.sh` — Destroy environment resources
 * `fmt.sh` — Format Terraform code
 * `output.sh` — Show Terraform outputs
 * `plan.sh` — Run Terraform plan
 * `prompt.sh` — Interactive menu for ops
 * `push.sh` — Commit and push changes
+* `common.sh` — Shared shell script functions
 
 ### `secrets/`
 
-* `fetch_from_rds.sh` — Retrieve secrets from AWS RDS (planned API integration)
-* `push_to_rds.sh` — Push local secrets to AWS RDS
+* `fetch_from_rds.sh` — Retrieve secrets from AWS RDS (mock API until Phase 7)
+* `push_to_rds.sh` — Push local secrets to AWS RDS (mock API until Phase 7)
 
 ### `src/`
 
 * `backend/` — Remote backend configs (`dev.s3.tfbackend`, `qa.s3.tfbackend`, `prod.s3.tfbackend`)
 * `config/` — YAML configs for GitHub automation (`repos.yaml`, `teams.yaml`, `users.yaml`, `secrets.yaml`)
 * `env/` — Env-specific Terraform vars (`dev.tfvars`, `qa.tfvars`, `prod.tfvars`)
-* `github/` — Python GitHub automation scripts (`repos.py`, `teams.py`, `users.py`, etc.)
+* `github/` — Python GitHub automation scripts (`repos.py`, `teams.py`, `users.py`, `secrets.py`, `ssh_keys.py`, `org.py`)
 * `modules/` — Terraform modules (IAM, CodeBuild, Glacier, Key Vault, RDS PostgreSQL, SMS)
-* `outputs.tf`, `providers.tf`, `root.tf`, `variables.tf`
+* Root files: `backend.tf`, `providers.tf`, `root.tf`, `variables.tf`, `locals.tf`, `outputs.tf`
 
 ### `ts/`
 
-* TypeScript source for AWS Glacier, SMS, and related services
+* TypeScript source for AWS Glacier, SMS, and related services (future integration)
 
 ---
 
 ## Features
 
 * **Multi-environment remote state**: Separate S3/DynamoDB backend configs for `dev`, `qa`, and `prod`
-* **AWS provisioning**: IAM, RDS PostgreSQL, Glacier, SMS, Key Vault, and more
-* **GitHub org automation**: Repos, teams, users, secrets, SSH keys, GPG keys, tokens, webhooks
-* **CI/CD ready**: AWS CodeBuild for Terraform execution (Phase 4)
-* **Secrets portability**: Local → AWS RDS sync (planned API for cross-device retrieval)
+* **CI/CD ready**: AWS CodeBuild for Terraform execution, replacing GitHub Actions
+* **AWS provisioning**: IAM, CodeBuild (future phases will add Glacier, SMS, RDS PostgreSQL, Key Vault)
+* **GitHub org automation**: Planned scripts for repos, teams, users, secrets, SSH keys, webhooks
+* **Secrets portability**: Local → AWS RDS sync (mock API until Dotnet controller in Phase 7)
 * **Interactive CLI**: `index.sh` + `prompt.sh` menu for common tasks
 
 ---
@@ -81,7 +83,7 @@ private/             → Local-only secrets (gitignored)
    * Terraform ≥ 1.3
    * AWS CLI with profiles for all target envs
    * Python 3.x + `PyGithub` (`pip install PyGithub pyyaml`)
-   * Node.js (for TypeScript modules)
+   * Node.js (for TypeScript modules in future phases)
    * GitHub personal access token (via env var or `.tfvars`)
 
 2. **Set environment variables** (optional but recommended)
@@ -117,18 +119,18 @@ bash shell/output.sh prod
 bash shell/destroy.sh dev
 ```
 
-### GitHub Automation
+---
 
-```sh
-python3 src/github/repos.py --config src/config/repos.yaml
-```
+## Shell Scripts Overview
 
-### Secrets Sync
-
-```sh
-bash secrets/push_to_rds.sh
-bash secrets/fetch_from_rds.sh
-```
+* **plan.sh** — Run `terraform plan` for the selected environment
+* **apply.sh** — Run `terraform apply` for the selected environment
+* **backend\_init.sh** — Initialize remote backend using `*.s3.tfbackend` file
+* **ensure\_backend.sh** — Validate backend configuration before apply/plan
+* **destroy.sh** — Tear down environment resources
+* **fmt.sh** — Format Terraform files
+* **output.sh** — Display Terraform outputs for the environment
+* **push.sh** — Commit & push changes to repo
 
 ---
 
@@ -138,18 +140,17 @@ Example `src/backend/dev.s3.tfbackend`:
 
 ```hcl
 bucket         = "insizon-terraform-remote-state-backend-bucket"
-key            = "terraform-github/dev/terraform.tfstate"
+key            = "terraform-github/dev.tfstate"
 region         = "us-east-2"
 dynamodb_table = "terraform-locks"
-profile        = "insizon"
 encrypt        = true
 ```
 
-Duplicate for `qa` and `prod` with updated key path.
+Duplicate for `qa` and `prod` with updated `key`.
 
 ---
 
-## GitHub Automation Scripts
+## GitHub Automation Scripts (Planned – Phase 5)
 
 * `repos.py` — Create/import repos from YAML
 * `teams.py` — Manage teams from YAML
@@ -163,19 +164,18 @@ Duplicate for `qa` and `prod` with updated key path.
 ## AWS Modules
 
 * **codebuild** — CodeBuild projects for Terraform execution
-* **glacier** — Glacier storage mgmt via Terraform + TS
 * **iam** — IAM roles, policies, users
+* **glacier** — Glacier storage mgmt (future)
 * **key\_vault** — Secure key storage
-* **rds\_postgres** — RDS PostgreSQL deployment
-* **sms** — AWS Server Migration Service integration
+* **rds\_postgres** — RDS PostgreSQL deployment (future)
+* **sms** — AWS Server Migration Service integration (future)
 
 ---
 
 ## Secrets Management
 
 * Local secrets in `private/` (gitignored)
-* Push/pull secrets with `secrets/` scripts
-* Planned .NET API for secure retrieval across devices
+* Push/pull secrets with `secrets/` scripts (mock API until Phase 7)
 
 ---
 
@@ -191,10 +191,10 @@ Duplicate for `qa` and `prod` with updated key path.
 ## Roadmap
 
 * **Phase 0**: Structure setup ✅
-* **Phase 1**: Multi-env remote state ✅
-* **Phase 2**: AWS Glacier, SMS, RDS PostgreSQL
-* **Phase 3**: GitHub automation scripts
-* **Phase 4**: CodeBuild integration
-* **Phase 5**: .NET secrets API
-* **Phase 6**: Python script tests
-* **Phase 7**: Automation monitoring/logging
+* **Phase 1**: Remote backend & env separation ✅
+* **Phase 2**: AWS CodeBuild CI for Terraform ✅
+* **Phase 3**: Secrets RDS sync scripts
+* **Phase 4**: AWS service modules expansion (Glacier, SMS, RDS)
+* **Phase 5**: GitHub automation scripts
+* **Phase 6**: Config enhancements (`highestLevel`)
+* **Phase 7**: Dotnet secrets API integration

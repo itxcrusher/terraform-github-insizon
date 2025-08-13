@@ -1,0 +1,46 @@
+version: 0.2
+
+env:
+  variables:
+    TF_PLUGIN_CACHE_DIR: "/root/.terraform.d/plugin-cache"
+    TF_VERSION: "1.7.5"
+
+cache:
+  paths:
+    - /root/.terraform.d/plugin-cache/**/*
+    - .terraform/**/*
+    - .terraform.lock.hcl
+    - /root/.cache/pip/**/*
+
+phases:
+  install:
+    commands:
+      - mkdir -p "$TF_PLUGIN_CACHE_DIR"
+      - if ! command -v unzip >/dev/null 2>&1; then apt-get update && apt-get install -y unzip; fi
+      - curl -fsSL https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o tf.zip
+      - unzip -o tf.zip -d /usr/local/bin && rm tf.zip
+      - terraform -version
+      - aws --version || pip3 install awscli --break-system-packages || pip install awscli
+      - chmod +x shell/*.sh || true
+
+  pre_build:
+    commands:
+      - echo "Repo checked out at $CODEBUILD_SRC_DIR"
+      - cd "$CODEBUILD_SRC_DIR"
+      - echo "ENV=$ENV  APPLY=$APPLY"
+      - echo "Formatting (non-blocking)"; bash shell/fmt.sh || true
+
+  build:
+    commands:
+      - echo "Planning via shell/plan.sh"
+      - bash shell/plan.sh "$ENV"
+
+  post_build:
+    commands:
+      - |
+        if [ "$APPLY" = "true" ]; then
+          echo "Applying via shell/apply.sh"
+          bash shell/apply.sh "$ENV"
+        else
+          echo "Skipping apply (APPLY=$APPLY)"
+        fi

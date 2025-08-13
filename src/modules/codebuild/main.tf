@@ -1,0 +1,168 @@
+
+
+# Trust for CodeBuild
+data "aws_iam_policy_document" "assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["codebuild.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "role" {
+  name               = "${var.project_name}-role"
+  assume_role_policy = data.aws_iam_policy_document.assume.json
+  tags               = var.tags
+}
+
+# Inline policy: logs, S3 backend, Dynamo lock, SSM params, KMS decrypt
+data "aws_iam_policy_document" "inline" {
+  statement {
+    sid       = "Logs"
+    actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "S3Backend"
+    actions = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [
+      "arn:aws:s3:::${var.backend_bucket}",
+      "arn:aws:s3:::${var.backend_bucket}/*",
+    ]
+  }
+
+  statement {
+    sid       = "DynamoLock"
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:DescribeTable"]
+    resources = ["arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.backend_lock_table_name}"]
+  }
+
+  statement {
+    sid       = "SSMParams"
+    actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
+    resources = ["arn:aws:ssm:${var.region}:${var.account_id}:parameter/${var.github_token_param}"]
+  }
+
+  # If the SSM parameter is SecureString, allow decrypt otherwise delete the KMS statement entirely.
+  # Using * simplifies AWS-managed key resolution.
+  statement {
+    sid       = "KmsDecryptForSSM"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+  }
+
+  # Terraform often needs to introspect caller identity
+  statement {
+    sid       = "STSMisc"
+    actions   = ["sts:GetCallerIdentity"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "policy" {
+  name   = "${var.project_name}-policy"
+  policy = data.aws_iam_policy_document.inline.json
+  tags   = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "attach" {
+  role       = aws_iam_role.role.name
+  policy_arn = aws_iam_policy.policy.arn
+}
+
+resource "aws_s3_bucket" "cb_cache" {
+  bucket        = "${var.project_name}-cache-${var.account_id}-${var.region}"
+  force_destroy = true
+  tags          = var.tags
+}
+
+# Register credential so CodeBuild can authenticate to GitHub
+resource "aws_codebuild_source_credential" "github_pat" {
+  auth_type   = "PERSONAL_ACCESS_TOKEN"
+  server_type = "GITHUB"
+  token       = var.github_token
+}
+
+resource "aws_codebuild_project" "project" {
+  name         = var.project_name
+  description  = "Terraform build for ${var.env}"
+  service_role = aws_iam_role.role.arn
+  tags         = var.tags
+
+  artifacts { type = "NO_ARTIFACTS" }
+
+  environment {
+    compute_type    = var.compute_type
+    image           = var.image
+    type            = "LINUX_CONTAINER"
+    privileged_mode = false
+
+    # Expose TF var via Parameter Store (resolved by CodeBuild at runtime)
+    # environment_variable {
+    #   name  = "TF_VAR_github_token"
+    #   type  = "PARAMETER_STORE"
+    #   value = var.github_token_param
+    # }
+
+    # Let buildspec know which env it is, and whether to apply
+    environment_variable {
+      name  = "ENV"
+      value = var.env
+    }
+    environment_variable {
+      name  = "APPLY"
+      value = var.apply ? "true" : "false"
+    }
+  }
+
+  # No connected GitHub source — connect via console
+  source {
+    type                = "GITHUB"
+    location            = var.repo_url
+    git_clone_depth     = 1
+    buildspec           = var.buildspec_path
+    report_build_status = true
+
+    # Uses the PAT registered by aws_codebuild_source_credential
+    auth {
+      resource = aws_codebuild_source_credential.github_pat.arn
+      type     = "OAUTH"
+    }
+  }
+
+  # No connected GitHub source — clone via token
+  # source {
+  #   type      = "NO_SOURCE"
+  #   buildspec = var.buildspec_inline
+  # }
+
+  logs_config {
+    cloudwatch_logs {
+      group_name  = "/codebuild/${var.project_name}"
+      stream_name = "build"
+    }
+  }
+  cache {
+    type     = "S3"
+    location = aws_s3_bucket.cb_cache.bucket
+  }
+}
+
+resource "aws_codebuild_webhook" "this" {
+  project_name = aws_codebuild_project.project.name
+  build_type   = "BUILD"
+
+  filter_group {
+    filter {
+      type    = "EVENT"
+      pattern = "PUSH"
+    }
+    filter {
+      type    = "HEAD_REF"
+      pattern = "refs/heads/${var.github_branch}" # for multi branch strategy select the branch according to environment (var.env)
+    }
+  }
+}

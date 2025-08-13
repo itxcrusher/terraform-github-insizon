@@ -1,7 +1,6 @@
 # Remote backend configuration for dev environment
 bucket         = "insizon-terraform-remote-state-backend-bucket"
-key            = "terraform-github/dev/terraform.tfstate"
+key            = "terraform-github/dev.tfstate"
 region         = "us-east-2"
 dynamodb_table = "terraform-locks"
-profile        = "insizon"
 encrypt        = true

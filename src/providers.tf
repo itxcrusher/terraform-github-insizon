@@ -15,11 +15,13 @@ terraform {
 
 # AWS Provider configuration
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region = var.aws_region
+  # Use local named profile if provided; otherwise rely on the CodeBuild role
+  profile = length(var.aws_profile) > 0 ? var.aws_profile : null
 }
 
 # GitHub Provider configuration
 provider "github" {
-  token = var.github_token
+  owner = var.github_owner
+  token = local.effective_github_token
 }
