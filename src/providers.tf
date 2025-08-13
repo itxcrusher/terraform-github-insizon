@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.3"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -9,19 +11,16 @@ terraform {
       version = "~> 6.0"
     }
   }
-
-  required_version = ">= 1.3"
 }
 
-# AWS Provider configuration
+# AWS
 provider "aws" {
-  region = var.aws_region
-  # Use local named profile if provided; otherwise rely on the CodeBuild role
-  profile = length(var.aws_profile) > 0 ? var.aws_profile : null
+  region  = local.cfg.aws.region
+  profile = try(local.cfg.aws.profile, null)
 }
 
-# GitHub Provider configuration
+# GitHub
 provider "github" {
-  owner = var.github_owner
-  token = local.effective_github_token
+  owner = local.cfg.github.owner
+  token = local.github_token
 }

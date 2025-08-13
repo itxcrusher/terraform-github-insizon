@@ -1,0 +1,21 @@
+aws:
+  region: us-east-2
+  profile: insizon
+  project: terraform-github
+
+github:
+  owner: crusher-labs
+  github_token_param: "insizon-github-token"
+  github_branch: "main"
+
+backend:
+  bucket: insizon-terraform-remote-state-backend-bucket
+  dynamodb_table: terraform-locks
+
+codebuild:
+  name_prefix: "tf-github"
+  repo_url: "https://github.com/itxcrusher/terraform-github-insizon.git"
+  buildspec_path: "src/modules/codebuild/buildspec-ci.yaml"
+  compute_type: BUILD_GENERAL1_MEDIUM
+  image: aws/codebuild/standard:7.0
+  apply_envs: [dev, qa]

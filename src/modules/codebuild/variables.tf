@@ -4,7 +4,6 @@ variable "env" { type = string }
 variable "project_name" { type = string }
 variable "repo_url" { type = string }
 variable "buildspec_path" { type = string }
-variable "buildspec_inline" { type = string }
 variable "backend_bucket" { type = string }
 variable "backend_lock_table_name" { type = string }
 variable "github_token" { type = string }

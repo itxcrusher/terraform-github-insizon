@@ -14,7 +14,5 @@ require_env "$ENVIRONMENT"
 tf_backend_init "$ENVIRONMENT"
 tf_format_validate
 
-VARS_FILE="$TF_ROOT/env/${ENVIRONMENT}.tfvars"
-[[ -f "$VARS_FILE" ]] || { echo "Missing $VARS_FILE"; exit 1; }
 echo "Applying Terraform changes for environment '$ENVIRONMENT'..."
-terraform apply -var-file="$VARS_FILE" -auto-approve
+terraform apply -input=false -auto-approve

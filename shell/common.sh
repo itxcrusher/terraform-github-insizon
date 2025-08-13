@@ -27,44 +27,57 @@ require_env() {
     dev|qa|prod) ;;
     *) echo "Error: invalid environment '$env' (use dev | qa | prod)"; exit 1 ;;
   esac
+
+  # Make env available to Terraform (no tfvars needed)
+  export TF_VAR_app_environment="$env"
 }
 
-# Initialize Terraform backend for a given environment.
+# Read aws.profile from src/config/config.yaml (indentation-safe for simple keys)
+yaml_get_aws_profile() {
+  local cfg="$TF_ROOT/config/config.yaml"
+  [[ -f "$cfg" ]] || return 0
+  awk '
+    $1 ~ /^aws:/ { inaws=1; next }
+    inaws && $1 ~ /^profile:/ {
+      gsub(/profile:[[:space:]]*/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      print $0; exit
+    }
+    inaws && $1 ~ /^[^[:space:]]/ { inaws=0 }
+  ' "$cfg"
+}
+
+# Initialize Terraform backend for a given environment (no tfvars)
 tf_backend_init() {
   local env="$1"
   require_env "$env"
 
-  # Ensure the remote backend infra exists before initializing Terraform.
   "$SCRIPT_DIR/ensure_backend.sh" "$env"
   cd "$TF_ROOT"
 
-  # Backend config path
   local backend_cfg_posix="$TF_ROOT/backend/${env}.s3.tfbackend"
   if [[ ! -f "$backend_cfg_posix" ]]; then
     echo "Error: backend config not found: $backend_cfg_posix"
     exit 1
   fi
 
-  # Read region for SDK + prep optional backend args
+  # Ensure region for AWS CLI/SDK
   local backend_region
-  backend_region="$(awk -F= '/^region[[:space:]]*=/{gsub(/^[^=]*=[[:space:]]*/,""); gsub(/[[:space:]]*/,""); gsub(/^"|"$/,""); print; exit}' "$backend_cfg_posix" 2>/dev/null || true)"
+  backend_region="$(awk -F= '/^region[[:space:]]*=/{gsub(/^[^=]*=[[:space:]]*/, ""); gsub(/[[:space:]]*/, ""); gsub(/^"|"$/, ""); print; exit}' "$backend_cfg_posix" 2>/dev/null || true)"
   export AWS_SDK_LOAD_CONFIG=1
   [[ -n "$backend_region" ]] && export AWS_DEFAULT_REGION="$backend_region"
 
-  # LOCAL ONLY: pass aws_profile from tfvars as backend arg (CI will not set this)
-  local tfvars_profile=""
+  # LOCAL ONLY: pick AWS_PROFILE from YAML if not set
   local extra_backend_args=()
-  if [[ -z "${CODEBUILD_BUILD_ID:-}" ]]; then
-    tfvars_profile="$(
-      awk -F= '/^aws_profile[[:space:]]*=/{gsub(/^[^=]*=[[:space:]]*/,""); gsub(/[[:space:]]*/,""); gsub(/^"|"$/,""); print; exit}' \
-      "$TF_ROOT/env/${env}.tfvars" 2>/dev/null || true
-    )"
-    if [[ -n "$tfvars_profile" ]]; then
-      extra_backend_args+=( -backend-config="profile=${tfvars_profile}" )
+  if [[ -z "${CODEBUILD_BUILD_ID:-}" && -z "${AWS_PROFILE:-}" ]]; then
+    local profile
+    profile="$(yaml_get_aws_profile || true)"
+    if [[ -n "$profile" ]]; then
+      export AWS_PROFILE="$profile"
+      extra_backend_args+=( -backend-config="profile=${profile}" )
     fi
   fi
 
-  # Windows path shim for terraform.exe under Git Bash
   local backend_cfg_arg="$backend_cfg_posix"
   if command -v cygpath >/dev/null 2>&1; then
     case "${OSTYPE:-}" in
@@ -72,7 +85,7 @@ tf_backend_init() {
     esac
   fi
 
-  # Re-init only when backend file hash changes or init missing
+  # Re-init when backend file hash changes
   local hash_cmd="" current_hash="" stored_hash="" stored_hash_file="$TF_ROOT/.terraform/backend.sha256"
   if command -v sha256sum >/dev/null 2>&1; then
     hash_cmd="sha256sum"
@@ -85,7 +98,7 @@ tf_backend_init() {
   fi
 
   if [[ -n "${FORCE_TF_INIT:-}" ]] || [[ -z "$hash_cmd" ]] || [[ "$current_hash" != "$stored_hash" ]] || [[ ! -d "$TF_ROOT/.terraform" ]]; then
-    echo "Running 'terraform init -reconfigure' (backend changed or missing init)."
+    echo "Running 'terraform init -reconfigure'."
     terraform init -backend-config="$backend_cfg_arg" "${extra_backend_args[@]}" -reconfigure
     if [[ -n "$hash_cmd" ]]; then
       mkdir -p "$TF_ROOT/.terraform"

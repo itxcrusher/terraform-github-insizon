@@ -22,4 +22,4 @@ tf_backend_init "$ENVIRONMENT"
 tf_format_validate
 
 cd "$TF_ROOT"
-terraform destroy -var-file="./env/${ENVIRONMENT}.tfvars" -auto-approve
+terraform destroy -input=false -auto-approve

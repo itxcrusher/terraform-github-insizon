@@ -113,14 +113,22 @@ main() {
   export AWS_SDK_LOAD_CONFIG=1
   export AWS_DEFAULT_REGION="$region"
 
-  # LOCAL ONLY: set AWS_PROFILE from tfvars if not already set
+  # LOCAL ONLY: set AWS_PROFILE from config.yaml if not set and not in CodeBuild
   if [[ -z "${CODEBUILD_BUILD_ID:-}" && -z "${AWS_PROFILE:-}" ]]; then
-    local tfvars="$TF_ROOT/env/${env}.tfvars"
-    if [[ -f "$tfvars" ]]; then
-      local tfvars_profile
-      tfvars_profile="$(awk -F= '/^aws_profile[[:space:]]*=/{gsub(/^[^=]*=[[:space:]]*/,""); gsub(/[[:space:]]*/,""); gsub(/^"|"$/,""); print; exit}' "$tfvars" 2>/dev/null || true)"
-      if [[ -n "$tfvars_profile" ]]; then
-        export AWS_PROFILE="$tfvars_profile"
+    local cfg="$TF_ROOT/config/config.yaml"
+    if [[ -f "$cfg" ]]; then
+      local profile
+      profile="$(awk '
+        $1 ~ /^aws:/ { inaws=1; next }
+        inaws && $1 ~ /^profile:/ {
+          gsub(/profile:[[:space:]]*/, "", $0)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+          print $0; exit
+        }
+        inaws && $1 ~ /^[^[:space:]]/ { inaws=0 }
+      ' "$cfg")"
+      if [[ -n "$profile" ]]; then
+        export AWS_PROFILE="$profile"
       fi
     fi
   fi

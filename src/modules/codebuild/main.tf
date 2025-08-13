@@ -34,6 +34,23 @@ data "aws_iam_policy_document" "inline" {
     ]
   }
 
+  # Access for CodeBuild S3 cache bucket
+  statement {
+    sid     = "S3Cache"
+    actions = ["s3:ListBucket"]
+    resources = [
+      aws_s3_bucket.cb_cache.arn
+    ]
+  }
+
+  statement {
+    sid     = "S3CacheObjects"
+    actions = ["s3:GetObject", "s3:PutObject", "s3:GetObjectVersion", "s3:DeleteObject"]
+    resources = [
+      "${aws_s3_bucket.cb_cache.arn}/*"
+    ]
+  }
+
   statement {
     sid       = "DynamoLock"
     actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:DescribeTable"]
@@ -100,13 +117,6 @@ resource "aws_codebuild_project" "project" {
     type            = "LINUX_CONTAINER"
     privileged_mode = false
 
-    # Expose TF var via Parameter Store (resolved by CodeBuild at runtime)
-    # environment_variable {
-    #   name  = "TF_VAR_github_token"
-    #   type  = "PARAMETER_STORE"
-    #   value = var.github_token_param
-    # }
-
     # Let buildspec know which env it is, and whether to apply
     environment_variable {
       name  = "ENV"
@@ -132,12 +142,6 @@ resource "aws_codebuild_project" "project" {
       type     = "OAUTH"
     }
   }
-
-  # No connected GitHub source — clone via token
-  # source {
-  #   type      = "NO_SOURCE"
-  #   buildspec = var.buildspec_inline
-  # }
 
   logs_config {
     cloudwatch_logs {

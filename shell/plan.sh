@@ -15,4 +15,4 @@ tf_backend_init "$ENVIRONMENT"
 tf_format_validate
 
 cd "$TF_ROOT"
-terraform plan -var-file="./env/${ENVIRONMENT}.tfvars"
+terraform plan -input=false

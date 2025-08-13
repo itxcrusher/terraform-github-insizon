@@ -1,26 +1,8 @@
 variable "app_environment" {
-  description = "Application environment (e.g., prod, qa)"
+  description = "Application environment (dev|qa|prod)"
   type        = string
-}
-
-variable "aws_region" {
-  description = "AWS region for resource deployment"
-  type        = string
-}
-
-variable "aws_profile" {
-  description = "AWS named profile for authentication"
-  type        = string
-  default     = ""
-}
-
-variable "github_owner" {
-  description = "GitHub org or username"
-  type        = string
-}
-
-variable "github_token" {
-  description = "GitHub personal access token for GitHub provider"
-  type        = string
-  default     = ""
+  validation {
+    condition     = contains(["dev", "qa", "prod"], var.app_environment)
+    error_message = "app_environment must be one of: dev, qa, prod."
+  }
 }
