@@ -34,30 +34,21 @@ data "aws_iam_policy_document" "inline" {
     ]
   }
 
-  # Access for CodeBuild S3 cache bucket
+  # Bucket-level reads Terraform does during refresh/plan
   statement {
-    sid = "S3Cache"
+    sid     = "S3CacheBucketReads"
     actions = [
       "s3:ListBucket",
-      "s3:GetBucketAcl",
-      "s3:GetBucketCors",
-      "s3:GetBucketLocation",
-      "s3:GetBucketPolicy",
-      "s3:GetBucketPolicyStatus",
-      "s3:GetBucketVersioning",
-      "s3:GetBucketWebsite",
-      "s3:GetBucketTagging",
-      "s3:GetBucketLogging",
-      "s3:GetBucketOwnershipControls",
-      "s3:GetEncryptionConfiguration",
-      "s3:GetLifecycleConfiguration",
-      "s3:GetBucketPublicAccessBlock"
+      # Read any bucket-* metadata (ACL, CORS, Policy, Location, Versioning, Website, Tagging, Logging, Ownership, PublicAccessBlock, etc.)
+      "s3:GetBucket*",
+      # Covers things like GetEncryptionConfiguration, GetLifecycleConfiguration,
+      # GetAccelerateConfiguration, etc., without granting object reads.
+      "s3:Get*Configuration"
     ]
-    resources = [
-      aws_s3_bucket.cb_cache.arn
-    ]
+    resources = [aws_s3_bucket.cb_cache.arn]
   }
 
+  # Cache Object-level access
   statement {
     sid     = "S3CacheObjects"
     actions = ["s3:GetObject", "s3:PutObject", "s3:GetObjectVersion", "s3:DeleteObject"]
