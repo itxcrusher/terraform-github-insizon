@@ -40,8 +40,18 @@ data "aws_iam_policy_document" "inline" {
     actions = [
       "s3:ListBucket",
       "s3:GetBucketAcl",
+      "s3:GetBucketCors",
+      "s3:GetBucketLocation",
       "s3:GetBucketPolicy",
-      "s3:GetBucketLocation"
+      "s3:GetBucketPolicyStatus",
+      "s3:GetBucketVersioning",
+      "s3:GetBucketWebsite",
+      "s3:GetBucketTagging",
+      "s3:GetBucketLogging",
+      "s3:GetBucketOwnershipControls",
+      "s3:GetEncryptionConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetBucketPublicAccessBlock"
     ]
     resources = [
       aws_s3_bucket.cb_cache.arn
