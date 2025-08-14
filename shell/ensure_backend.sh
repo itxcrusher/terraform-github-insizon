@@ -113,7 +113,7 @@ main() {
   export AWS_DEFAULT_REGION="$region"
 
   # Auth sanity check (helps diagnose 403s)
-  echo -n "AWS caller identity (profile ${AWS_PROFILE:-none}): "
+  echo -n "Using AWS caller identity (profile ${AWS_PROFILE:-none}): "
   aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "UNAVAILABLE"
 
   command -v aws >/dev/null 2>&1 || { echo "Error: aws CLI not found."; exit 1; }

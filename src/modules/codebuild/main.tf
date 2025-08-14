@@ -36,7 +36,7 @@ data "aws_iam_policy_document" "inline" {
 
   # Bucket-level reads Terraform does during refresh/plan
   statement {
-    sid     = "S3CacheBucketReads"
+    sid = "S3CacheBucketReads"
     actions = [
       "s3:ListBucket",
       # Read any bucket-* metadata (ACL, CORS, Policy, Location, Versioning, Website, Tagging, Logging, Ownership, PublicAccessBlock, etc.)
