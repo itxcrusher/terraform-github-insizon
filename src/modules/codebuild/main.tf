@@ -71,6 +71,82 @@ data "aws_iam_policy_document" "inline" {
     resources = ["*"]
   }
 
+  # Allow reading/updating the CodeBuild role itself (this module's role)
+  statement {
+    sid = "IamRoleSelfManage"
+    actions = [
+      "iam:GetRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:PassRole",
+      "iam:UpdateRole"
+    ]
+    resources = [
+      "arn:aws:iam::${var.account_id}:role/${var.project_name}-role"
+    ]
+  }
+
+  # Allow managing the inline/customer-managed policy this module creates/attaches
+  statement {
+    sid = "IamPolicyManage"
+    actions = [
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion",
+      "iam:CreatePolicy",
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicyVersion",
+      "iam:DeletePolicy",
+      "iam:ListPolicyVersions"
+    ]
+    # match the policy created by this module (or any with our name_prefix if you prefer)
+    resources = [
+      "arn:aws:iam::${var.account_id}:policy/${var.project_name}-policy",
+      "arn:aws:iam::${var.account_id}:policy/${var.name_prefix}*"
+    ]
+  }
+
+  # Allow CodeBuild project reads/updates used by the provider
+  statement {
+    sid = "CodeBuildProjectManage"
+    actions = [
+      "codebuild:BatchGetProjects",
+      "codebuild:CreateProject",
+      "codebuild:UpdateProject",
+      "codebuild:DeleteProject"
+    ]
+    resources = [
+      "arn:aws:codebuild:${var.region}:${var.account_id}:project/${var.project_name}"
+    ]
+  }
+
+  # Source credentials management (PAT linkage)
+  statement {
+    sid = "CodeBuildSourceCreds"
+    actions = [
+      "codebuild:ImportSourceCredentials",
+      "codebuild:ListSourceCredentials",
+      "codebuild:DeleteSourceCredentials"
+    ]
+    resources = ["*"]
+  }
+
+  # The provider tries to read bucket policy on the cache bucket
+  statement {
+    sid = "S3CacheBucketPolicyRead"
+    actions = [
+      "s3:GetBucketPolicy",
+      "s3:PutBucketPolicy"
+    ]
+    resources = [
+      "arn:aws:s3:::${var.project_name}-cache-${var.account_id}-${var.region}"
+    ]
+  }
+
   # Terraform often needs to introspect caller identity
   statement {
     sid       = "STSMisc"
