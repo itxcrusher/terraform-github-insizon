@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TF_ROOT="$REPO_ROOT/src"
 
-# Validate environment input: dev | qa | prod
+# Validate environment input: dev | qa | prod, export TF_VAR_app_environment and AWS_PROFILE (local)
 require_env() {
   local env="${1:-}"
   if [[ -z "$env" ]]; then
@@ -30,27 +30,44 @@ require_env() {
 
   # Make env available to Terraform (no tfvars needed)
   export TF_VAR_app_environment="$env"
+
+  # LOCAL ONLY: export AWS_PROFILE from YAML so all downstream scripts inherit it
+  if [[ -z "${CODEBUILD_BUILD_ID:-}" ]]; then
+    if [[ -z "${AWS_PROFILE:-}" ]]; then
+      local profile
+      if profile="$(yaml_get_aws_profile)"; then
+        if [[ -n "$profile" ]]; then
+          export AWS_PROFILE="$profile"
+          echo "Using AWS profile from config.yaml: $AWS_PROFILE"
+        else
+          echo "WARNING: aws.profile not found in src/config/config.yaml; using default AWS credentials." >&2
+        fi
+      else
+        echo "WARNING: src/config/config.yaml not found; using default AWS credentials." >&2
+      fi
+    fi
+  fi
 }
 
-# Read aws.profile from src/config/config.yaml (indentation-safe for simple keys)
+# Read aws.profile from src/config/config.yaml (handles BOM + CRLF, top-level scoping)
 yaml_get_aws_profile() {
   local cfg="$TF_ROOT/config/config.yaml"
-  [[ -f "$cfg" ]] || return 0
-  awk '
-    $1 ~ /^aws:/ { inaws=1; next }
-    inaws && $1 ~ /^profile:/ {
-      gsub(/profile:[[:space:]]*/, "", $0)
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
-      print $0; exit
+  [[ -f "$cfg" ]] || return 1
+  # strip BOM, strip CR, then awk within top-level 'aws:' block only
+  sed '1s/^\xEF\xBB\xBF//' "$cfg" | tr -d '\r' | awk '
+    /^[[:space:]]*aws:[[:space:]]*$/ { inaws=1; next }
+    inaws && /^[^[:space:]]/ { inaws=0 }                 # left margin = new top-level key
+    inaws && /^[[:space:]]*profile:[[:space:]]*/ {
+      sub(/^[^:]*:[ \t]*/, "", $0)
+      gsub(/^[ \t]+|[ \t]+$/, "", $0)
+      print; exit
     }
-    inaws && $1 ~ /^[^[:space:]]/ { inaws=0 }
-  ' "$cfg"
+  '
 }
 
 # Initialize Terraform backend for a given environment (no tfvars)
 tf_backend_init() {
   local env="$1"
-  require_env "$env"
 
   "$SCRIPT_DIR/ensure_backend.sh" "$env"
   cd "$TF_ROOT"
@@ -67,16 +84,7 @@ tf_backend_init() {
   export AWS_SDK_LOAD_CONFIG=1
   [[ -n "$backend_region" ]] && export AWS_DEFAULT_REGION="$backend_region"
 
-  # LOCAL ONLY: pick AWS_PROFILE from YAML if not set
-  local extra_backend_args=()
-  if [[ -z "${CODEBUILD_BUILD_ID:-}" && -z "${AWS_PROFILE:-}" ]]; then
-    local profile
-    profile="$(yaml_get_aws_profile || true)"
-    if [[ -n "$profile" ]]; then
-      export AWS_PROFILE="$profile"
-      extra_backend_args+=( -backend-config="profile=${profile}" )
-    fi
-  fi
+  # NOTE: no profile logic here; require_env() already exported AWS_PROFILE (local only).
 
   local backend_cfg_arg="$backend_cfg_posix"
   if command -v cygpath >/dev/null 2>&1; then
@@ -99,7 +107,7 @@ tf_backend_init() {
 
   if [[ -n "${FORCE_TF_INIT:-}" ]] || [[ -z "$hash_cmd" ]] || [[ "$current_hash" != "$stored_hash" ]] || [[ ! -d "$TF_ROOT/.terraform" ]]; then
     echo "Running 'terraform init -reconfigure'."
-    terraform init -backend-config="$backend_cfg_arg" "${extra_backend_args[@]}" -reconfigure
+    terraform init -backend-config="$backend_cfg_arg" -reconfigure
     if [[ -n "$hash_cmd" ]]; then
       mkdir -p "$TF_ROOT/.terraform"
       echo "$current_hash  $(basename "$backend_cfg_posix")" > "$stored_hash_file"

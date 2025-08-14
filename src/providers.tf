@@ -15,8 +15,8 @@ terraform {
 
 # AWS
 provider "aws" {
-  region  = local.cfg.aws.region
-  profile = try(local.cfg.aws.profile, null)
+  region = local.cfg.aws.region
+  # profile = try(local.cfg.aws.profile, null)
 }
 
 # GitHub

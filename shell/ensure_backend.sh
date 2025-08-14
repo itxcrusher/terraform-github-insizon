@@ -78,7 +78,6 @@ ensure_s3_bucket() {
   return 2
 }
 
-
 ensure_dynamodb_table() {
   local table="$1" region="$2"
   if aws dynamodb describe-table --table-name "$table" --region "$region" >/dev/null 2>&1; then
@@ -113,25 +112,9 @@ main() {
   export AWS_SDK_LOAD_CONFIG=1
   export AWS_DEFAULT_REGION="$region"
 
-  # LOCAL ONLY: set AWS_PROFILE from config.yaml if not set and not in CodeBuild
-  if [[ -z "${CODEBUILD_BUILD_ID:-}" && -z "${AWS_PROFILE:-}" ]]; then
-    local cfg="$TF_ROOT/config/config.yaml"
-    if [[ -f "$cfg" ]]; then
-      local profile
-      profile="$(awk '
-        $1 ~ /^aws:/ { inaws=1; next }
-        inaws && $1 ~ /^profile:/ {
-          gsub(/profile:[[:space:]]*/, "", $0)
-          gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
-          print $0; exit
-        }
-        inaws && $1 ~ /^[^[:space:]]/ { inaws=0 }
-      ' "$cfg")"
-      if [[ -n "$profile" ]]; then
-        export AWS_PROFILE="$profile"
-      fi
-    fi
-  fi
+  # Auth sanity check (helps diagnose 403s)
+  echo -n "AWS caller identity (profile ${AWS_PROFILE:-none}): "
+  aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "UNAVAILABLE"
 
   command -v aws >/dev/null 2>&1 || { echo "Error: aws CLI not found."; exit 1; }
 
