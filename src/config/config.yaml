@@ -1,22 +1,138 @@
+# ==============================================================================
+# Insizon Terraform — Central Configuration (YAML)
+# ------------------------------------------------------------------------------
+# This file is the single source of truth for environment-agnostic settings and
+# module inputs. Terraform reads this file in locals.tf via yamldecode().
+#
+# How to use:
+# - Edit values here; do NOT hardcode in .tf files.
+# - Gate module creation per environment using `highestLevel`.
+# - CI apply behavior is controlled by `codebuild.apply_envs`.
+# ==============================================================================
+
 aws:
+  # Default AWS region for all providers and resources
   region: us-east-2
+  # Named profile if you run locally with AWS CLI
   profile: insizon
+  # Project label for tagging (purely informational)
   project: terraform-github
 
 github:
-  owner: crusher-labs
+  # GitHub organization or user that owns the repos
+  owner: itxcrusher
+  # Name of the SSM SecureString parameter holding a PAT for GitHub
   github_token_param: "insizon-github-token"
-  # github_token_param: "insizon-github-ci-token"   # <— CI token ONLY
+  # Default branch for webhooks/CI triggers (CodeBuild webhook)
   github_branch: "main"
 
 backend:
+  # S3 bucket that stores Terraform remote state for ALL envs (dev/qa/prod)
   bucket: insizon-terraform-remote-state-backend-bucket
+  # DynamoDB table used for state locking
   dynamodb_table: terraform-locks
 
 codebuild:
+  # Names follow: <name_prefix>-<env>  e.g., tf-github-dev
   name_prefix: "tf-github"
+  # GitHub repository for this Terraform project (used by CodeBuild source)
   repo_url: "https://github.com/itxcrusher/terraform-github-insizon.git"
+  # Path to the buildspec file in this repo
   buildspec_path: "src/modules/codebuild/buildspec-ci.yaml"
+  # Build environment options
   compute_type: BUILD_GENERAL1_MEDIUM
   image: aws/codebuild/standard:7.0
+  # Environments that are allowed to APPLY automatically in CI (others plan-only)
+  # Typical patterns:
+  #   - [dev]          → only dev applies automatically
+  #   - [dev, qa]      → dev & qa auto-apply, prod remains manual
+  #   - [dev, qa, prod]→ all auto-apply (not recommended)
   apply_envs: [dev]
+
+# ------------------------------------------------------------------------------
+# Module Gating by Environment (Feature Flags)
+# ------------------------------------------------------------------------------
+# Only environments listed for a module will build that module.
+# Environments are: dev, qa, prod
+highestLevel:
+  glacier:     [dev, qa, prod]  # enable S3 lifecycle → Glacier transitions
+  sms:         [dev, qa, prod]  # enable SNS SMS (and optional Pinpoint)
+  rds:         [prod]           # RDS only in prod by default
+  kms:         [dev, qa, prod]  # KMS CMK is needed everywhere
+  temp_access: [dev, qa]        # short-lived IAM roles for lower envs only
+
+# ------------------------------------------------------------------------------
+# Module Inputs
+# ------------------------------------------------------------------------------
+# 1) Glacier lifecycle rules
+glacier:
+  # Each rule targets an existing S3 bucket and prefix (folder-like key prefix).
+  # Adjust days to match retention policy and costs.
+  rules:
+    - bucket: insizon-artifacts-bucket
+      prefix: logs/
+      to_ir_after: 30     # move to Glacier Instant Retrieval after 30 days
+      to_fr_after: 120     # then to Glacier Flexible Retrieval after 90 days
+      to_da_after: 365    # then to Deep Archive after 365 days
+      expire_after: 1095  # delete after 3 years (optional)
+
+# 2) SMS (SNS + optional Pinpoint)
+sms:
+  # Account-level SMS preferences for Amazon SNS (strings per AWS API)
+  preferences:
+    default_sender_id: "INSIZON"                 # may be ignored by some countries
+    monthly_spend_limit: "1"                    # USD/month as STRING
+    default_sms_type: "Transactional"            # or "Promotional"
+    delivery_status_iam_role_arn: ""             # optional; required for DS to CW
+    delivery_status_success_sampling_rate: "0"   # "0".."100" as STRING
+    usage_report_s3_bucket: ""                   # optional S3 bucket for usage
+
+  # Optional SNS topics your applications can publish to
+  topics:
+    - name: "insizon-sms-events"
+      display_name: "Insizon SMS Events"
+      # policy_json: |  # (optional) paste full IAM policy JSON to control publishers
+      #   { ... }
+      tags: { purpose: "sms" }
+
+  # Optional: Pinpoint for advanced SMS (origination identities, analytics)
+  pinpoint:
+    enable: false
+    application_name: "insizon-sms-app"
+
+# 3) RDS for PostgreSQL
+rds:
+  engine_version: "15.4"
+
+  # Per-environment sizing & retention (tune as needed)
+  dev:  { instance_class: db.t4g.micro,  multi_az: false, allocated_storage: 20,  backup_retention: 3 }
+  qa:   { instance_class: db.t4g.small,  multi_az: true,  allocated_storage: 50,  backup_retention: 7 }
+  prod: { instance_class: db.m6g.large,  multi_az: true,  allocated_storage: 200, backup_retention: 14 }
+
+  # Networking (provide real IDs)
+  vpc_id: "vpc-0ea9888b4bd62ccb4"
+  subnet_ids: ["subnet-0927b9c05b9fcf0d0","subnet-0d3cef8a0ebac1db9"]
+  sg_ids: ["sg-0026487553bf7472a"]
+
+  # Database identity
+  db_name: "appdb"
+
+  # Admin credentials are pulled from SSM SecureString at these paths
+  username_ssm: "insizon-rds-username"    # app_admin
+  password_ssm: "insizon-rds-password"    # Password123!
+
+# 4) KMS CMK (used by services, Secrets Manager, etc.)
+kms:
+  alias_name: "alias/insizon-kms"
+  rotation_days: 365   # AWS supports 90–365; 365 is standard
+
+# 5) IAM Temp Access roles (least-privilege, short sessions)
+temp_access:
+  # IMPORTANT: tighten this to specific ARNs (users/roles) when you can.
+  assume_principals: ["*"]
+  roles:
+    - name: "temp-readonly"
+      max_session_seconds: 3600
+      policy_statements:
+        - actions: ["s3:ListBucket","s3:GetObject"]
+          resources: ["arn:aws:s3:::insizon-*","arn:aws:s3:::insizon-*/*"]

@@ -195,8 +195,8 @@ All scripts support **dry-run mode** for safe testing before live changes.
 * **Phase 0**: Structure setup ✅
 * **Phase 1**: Remote backend & env separation ✅
 * **Phase 2**: AWS CodeBuild CI for Terraform ✅
-* **Phase 3**: Secrets RDS sync scripts
-* **Phase 4**: AWS service modules expansion (Glacier, SMS, RDS)
-* **Phase 5**: GitHub automation scripts ✅
-* **Phase 6**: Config enhancements (`highestLevel`)
+* **Phase 3**: AWS service modules expansion (Glacier, SMS, RDS) ✅
+* **Phase 4**: GitHub automation scripts ✅
+* **Phase 5**: Config enhancements (`highestLevel`) ✅
+* **Phase 6**: Secrets RDS sync scripts
 * **Phase 7**: Dotnet secrets API integration

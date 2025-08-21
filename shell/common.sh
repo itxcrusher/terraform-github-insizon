@@ -84,36 +84,64 @@ tf_backend_init() {
   export AWS_SDK_LOAD_CONFIG=1
   [[ -n "$backend_region" ]] && export AWS_DEFAULT_REGION="$backend_region"
 
-  # NOTE: no profile logic here; require_env() already exported AWS_PROFILE (local only).
+  # Determine whether we must re-init
+  local need_init="false"
 
-  local backend_cfg_arg="$backend_cfg_posix"
-  if command -v cygpath >/dev/null 2>&1; then
-    case "${OSTYPE:-}" in
-      msys*|cygwin*) backend_cfg_arg="$(cygpath -w "$backend_cfg_posix")" ;;
-    esac
-  fi
+  # 1) If .terraform is missing, we must init
+  [[ ! -d ".terraform" ]] && need_init="true"
 
-  # Re-init when backend file hash changes
-  local hash_cmd="" current_hash="" stored_hash="" stored_hash_file="$TF_ROOT/.terraform/backend.sha256"
+  # 2) If modules metadata is missing, we must init (modules.json is created by `terraform init`)
+  [[ ! -f ".terraform/modules/modules.json" ]] && need_init="true"
+
+  # 3) If backend config hash changed, we must reconfigure
+  local hash_cmd="" current_backend_hash="" stored_backend_hash="" stored_backend_file="$TF_ROOT/.terraform/backend.sha256"
   if command -v sha256sum >/dev/null 2>&1; then
     hash_cmd="sha256sum"
   elif command -v shasum >/dev/null 2>&1; then
     hash_cmd="shasum -a 256"
   fi
   if [[ -n "$hash_cmd" ]]; then
-    current_hash="$($hash_cmd "$backend_cfg_posix" | awk '{print $1}')"
-    [[ -f "$stored_hash_file" ]] && stored_hash="$(awk '{print $1}' "$stored_hash_file")"
+    current_backend_hash="$($hash_cmd "$backend_cfg_posix" | awk '{print $1}')"
+    [[ -f "$stored_backend_file" ]] && stored_backend_hash="$(awk '{print $1}' "$stored_backend_file")"
+    [[ "$current_backend_hash" != "$stored_backend_hash" ]] && need_init="true"
   fi
 
-  if [[ -n "${FORCE_TF_INIT:-}" ]] || [[ -z "$hash_cmd" ]] || [[ "$current_hash" != "$stored_hash" ]] || [[ ! -d "$TF_ROOT/.terraform" ]]; then
+  # 4) If Terraform root/module files changed, re-init to refresh modules & providers
+  #    We hash all *.tf in src/ and module subdirs (cheap & reliable)
+  local modules_hash_file="$TF_ROOT/.terraform/modules.sha256"
+  local current_modules_hash=""
+  if [[ -n "$hash_cmd" ]]; then
+    # Guard against huge paths: find . -type f -name '*.tf' under src root
+    # Use sort -z to get stable order and xargs -0 to feed to the hasher
+    if command -v find >/dev/null 2>&1; then
+      # shellcheck disable=SC2016
+      current_modules_hash="$(
+        find "$TF_ROOT" -type f -name '*.tf' -print0 \
+        | sort -z \
+        | xargs -0 $hash_cmd 2>/dev/null \
+        | $hash_cmd | awk '{print $1}'
+      )"
+      local stored_modules_hash=""
+      [[ -f "$modules_hash_file" ]] && stored_modules_hash="$(awk '{print $1}' "$modules_hash_file")"
+      [[ "$current_modules_hash" != "$stored_modules_hash" ]] && need_init="true"
+    fi
+  fi
+
+  # 5) Manual override
+  [[ -n "${FORCE_TF_INIT:-}" ]] && need_init="true"
+
+  if [[ "$need_init" == "true" ]]; then
     echo "Running 'terraform init -reconfigure'."
-    terraform init -backend-config="$backend_cfg_arg" -reconfigure
+    terraform init -backend-config="$backend_cfg_posix" -reconfigure
+
+    # Persist hashes for future runs
     if [[ -n "$hash_cmd" ]]; then
       mkdir -p "$TF_ROOT/.terraform"
-      echo "$current_hash  $(basename "$backend_cfg_posix")" > "$stored_hash_file"
+      [[ -n "$current_backend_hash" ]] && echo "$current_backend_hash  $(basename "$backend_cfg_posix")" > "$stored_backend_file"
+      [[ -n "$current_modules_hash" ]] && echo "$current_modules_hash  modules" > "$modules_hash_file"
     fi
   else
-    echo "Skipping 'terraform init' — backend unchanged."
+    echo "Skipping 'terraform init' — backend & modules unchanged."
   fi
 }
 
