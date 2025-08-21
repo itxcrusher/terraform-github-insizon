@@ -1,0 +1,8 @@
+Create Project repo:
+-- Create custom roles: GitHub doesn’t expose creation of Custom Repository Roles via public API for orgs; it’s Enterprise-only and limited.
+
+Create other:
+-- Classic tokens: Not possible via GitHub REST (PATs cannot be created programmatically for security).
+-- “New token” (fine-grained): Same restriction. Use a GitHub App if automation for scoped tokens is required.
+
+GPG keys are per-user, not org. We can add them for the authenticated user (the token owner).

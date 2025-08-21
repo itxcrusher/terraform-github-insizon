@@ -30,10 +30,6 @@ phases:
       - export TF_VAR_app_environment="$ENV"
       - echo "ENV=$ENV  APPLY=$APPLY  TF_VAR_app_environment=$TF_VAR_app_environment"
       - echo "Formatting (non-blocking)"; bash shell/fmt.sh || true
-      - echo "Repo checked out at $CODEBUILD_SRC_DIR"
-      - cd "$CODEBUILD_SRC_DIR"
-      - echo "ENV=$ENV  APPLY=$APPLY"
-      - echo "Formatting (non-blocking)"; bash shell/fmt.sh || true
 
   build:
     commands:

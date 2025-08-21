@@ -150,14 +150,16 @@ Duplicate for `qa` and `prod` with updated `key`.
 
 ---
 
-## GitHub Automation Scripts (Planned – Phase 5)
+## GitHub Automation Scripts
 
-* `repos.py` — Create/import repos from YAML
-* `teams.py` — Manage teams from YAML
-* `users.py` — Invite/manage users
-* `secrets.py` — Manage GitHub secrets
-* `ssh_keys.py` — Manage SSH keys
-* `org.py` — Org-level settings
+* `repos.py` — Create/import repos from YAML (with branch protections, rulesets, workflows, webhooks)
+* `teams.py` — Manage teams and their repo permissions from YAML
+* `users.py` — Invite/manage users and attach them to teams
+* `secrets.py` — Manage GitHub org/repo/environment secrets
+* `ssh_keys.py` — Manage SSH keys and deployment keys
+* `org.py` — Org-level settings, hooks, and policies
+
+All scripts support **dry-run mode** for safe testing before live changes.
 
 ---
 
@@ -195,6 +197,6 @@ Duplicate for `qa` and `prod` with updated `key`.
 * **Phase 2**: AWS CodeBuild CI for Terraform ✅
 * **Phase 3**: Secrets RDS sync scripts
 * **Phase 4**: AWS service modules expansion (Glacier, SMS, RDS)
-* **Phase 5**: GitHub automation scripts
+* **Phase 5**: GitHub automation scripts ✅
 * **Phase 6**: Config enhancements (`highestLevel`)
 * **Phase 7**: Dotnet secrets API integration

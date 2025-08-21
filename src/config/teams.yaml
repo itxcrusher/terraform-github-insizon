@@ -1,0 +1,10 @@
+teams:
+  - name: insizon-team
+    description: Core team
+    privacy: closed            # closed | secret
+    maintainers: [itxcrusher]
+    members: []
+    repos:
+      - name: test-dev
+        permission: push       # pull | push | maintain | admin | triage
+       

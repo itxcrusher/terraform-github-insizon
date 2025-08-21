@@ -1,0 +1,5 @@
+users:
+  - username: itxcrusher
+    full_name: Muhammad Hassaan Javed
+    teams: [insizon-team]
+    role: member               # owner | member

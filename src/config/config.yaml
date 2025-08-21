@@ -6,6 +6,7 @@ aws:
 github:
   owner: crusher-labs
   github_token_param: "insizon-github-token"
+  # github_token_param: "insizon-github-ci-token"   # <— CI token ONLY
   github_branch: "main"
 
 backend:
@@ -18,4 +19,4 @@ codebuild:
   buildspec_path: "src/modules/codebuild/buildspec-ci.yaml"
   compute_type: BUILD_GENERAL1_MEDIUM
   image: aws/codebuild/standard:7.0
-  apply_envs: [dev, qa]
+  apply_envs: [dev]

@@ -1,0 +1,19 @@
+# this file defines the default configuration for the github automation scripts
+# Flow: Repos → Secrets → Keys → Org hooks → Teams → Users → GPG
+
+aws_profile: insizon
+owner: crusher-labs
+region: us-east-2
+
+# Use a HIGH-SCOPE token for org/repo admin work
+# ssm_token: insizon-github-admin-token
+ssm_token: insizon-github-token
+
+# default paths (you can omit and use per-script --config flags)
+configs:
+  repos:    src/config/repos.yaml
+  teams:    src/config/teams.yaml
+  users:    src/config/users.yaml
+  secrets:  src/config/secrets.yaml
+  dump:     private/github_secrets
+  

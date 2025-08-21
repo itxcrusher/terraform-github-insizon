@@ -1,0 +1,1 @@
+# Now Pylance treats src/github as a proper package, and your from _common import ... works with extraPaths.

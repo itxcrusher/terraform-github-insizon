@@ -1,0 +1,42 @@
+# this file is used to create repositories in GitHub using the GitHub API
+# future features have been commented out to give an idea on how to implement them
+
+repos:
+  - name: test-dev
+    # rename_from: test-dev     # when changing name add the old name here otherwise new repo will be created
+    description: Dev repo
+    visibility: public        # private | public | internal
+    default_branch: dev        # created if missing
+    topics: [terraform, devops]
+    environments: [dev]        # create Actions envs
+    # transfer_from: 
+    # source_url: 
+    protected_branches:
+      - name: dev
+        require_pr_reviews: 1
+        dismiss_stale_reviews: true
+        # require_status_checks:
+        #   contexts: ["ci/test", "terraform/plan"]
+    rulesets:
+      - name: "dev-guardrails"
+        target: branch              # branch | tag
+        enforcement: active         # active | disabled | evaluating
+        conditions:
+          ref_name:
+            include: ["refs/heads/dev"]
+            exclude: []
+        rules:
+          pull_request:
+            required_approving_review_count: 1
+          non_fast_forward: {}
+          deletion: {}
+    repo_webhooks:
+      - url: "https://api.insizon.com/github/repo-hook"
+        content_type: json
+        secret: ssm:/repo/hooks/secret
+        events: [push, pull_request]
+        active: true
+    # workflows:
+    #   - path: ".github/workflows/bootstrap.yml"
+    #     source_file: "private/workflows/bootstrap.yml"
+    #     message: "chore: add bootstrap workflow"
